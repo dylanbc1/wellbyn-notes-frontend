@@ -17,14 +17,24 @@
   "auth": {
     "login": "Iniciar Sesión",
     "loggingIn": "Iniciando sesión...",
+    "register": "Registrarse",
+    "registering": "Registrando...",
     "email": "Correo Electrónico",
     "password": "Contraseña",
+    "fullName": "Nombre Completo",
+    "fullNamePlaceholder": "Tu nombre completo",
     "emailPlaceholder": "tu@email.com",
     "passwordPlaceholder": "••••••••",
     "loginError": "Error al iniciar sesión. Verifica tus credenciales.",
+    "registerError": "Error al registrarse. El correo puede estar en uso.",
+    "registerSuccess": "Registro exitoso. Inicia sesión para continuar.",
     "logout": "Cerrar Sesión",
     "restrictedAccess": "Acceso restringido a personal médico autorizado",
-    "needHelp": "¿Necesitas ayuda? Contacta al administrador del sistema"
+    "needHelp": "¿Necesitas ayuda? Contacta al administrador del sistema",
+    "alreadyHaveAccount": "¿Ya tienes cuenta?",
+    "dontHaveAccount": "¿No tienes cuenta?",
+    "switchToLogin": "Iniciar sesión",
+    "switchToRegister": "Registrarse"
   },
   "sidebar": {
     "title": "Notes",

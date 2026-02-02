@@ -74,12 +74,11 @@ export const getCurrentUser = async (): Promise<User> => {
   return response.data;
 };
 
-// Register (solo para administradores en producción)
+// Register público
 export const register = async (userData: {
   email: string;
   full_name: string;
   password: string;
-  role: 'doctor' | 'administrator';
 }): Promise<User> => {
   const response = await api.post<User>('/api/auth/register', userData);
   return response.data;

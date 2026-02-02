@@ -17,14 +17,24 @@
   "auth": {
     "login": "Sign In",
     "loggingIn": "Signing in...",
+    "register": "Sign Up",
+    "registering": "Registering...",
     "email": "Email",
     "password": "Password",
+    "fullName": "Full Name",
+    "fullNamePlaceholder": "Your full name",
     "emailPlaceholder": "your@email.com",
     "passwordPlaceholder": "••••••••",
     "loginError": "Error signing in. Please check your credentials.",
+    "registerError": "Error signing up. Email may already be in use.",
+    "registerSuccess": "Registration successful. Please sign in to continue.",
     "logout": "Sign Out",
     "restrictedAccess": "Access restricted to authorized medical personnel",
-    "needHelp": "Need help? Contact the system administrator"
+    "needHelp": "Need help? Contact the system administrator",
+    "alreadyHaveAccount": "Already have an account?",
+    "dontHaveAccount": "Don't have an account?",
+    "switchToLogin": "Sign in",
+    "switchToRegister": "Sign up"
   },
   "sidebar": {
     "title": "Notes",
