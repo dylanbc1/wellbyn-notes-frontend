@@ -12,7 +12,18 @@ interface UseDeepgramStreamingReturn {
   clearTranscript: () => void;
 }
 
-const WS_URL = `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.hostname}:8000/api/transcriptions/stream`;
+// Construir URL del WebSocket usando la misma URL base que la API
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+const getWebSocketUrl = (): string => {
+  // Convertir URL HTTP/HTTPS a WS/WSS
+  const url = new URL(API_BASE_URL);
+  const protocol = url.protocol === 'https:' ? 'wss:' : 'ws:';
+  // Limpiar pathname (remover trailing slash) y agregar endpoint
+  const basePath = url.pathname.replace(/\/$/, '');
+  return `${protocol}//${url.host}${basePath}/api/transcriptions/stream`;
+};
+
+const WS_URL = getWebSocketUrl();
 
 export const useDeepgramStreaming = (): UseDeepgramStreamingReturn => {
   const [isConnected, setIsConnected] = useState(false);
