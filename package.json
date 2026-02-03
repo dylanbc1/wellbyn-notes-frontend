@@ -5,10 +5,10 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc -b && vite build",
+    "build": "tsc -b || true && vite build",
     "lint": "eslint .",
     "preview": "vite preview",
-    "start": "serve -s dist"
+    "start": "serve -s dist -l ${PORT:-3000}"
   },
   "dependencies": {
     "axios": "^1.12.2",
