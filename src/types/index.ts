@@ -184,10 +184,7 @@ export interface SupportedEHR {
 }
 
 // Authentication Types
-export enum UserRole {
-  DOCTOR = 'doctor',
-  ADMINISTRATOR = 'administrator'
-}
+export type UserRole = 'doctor' | 'administrator';
 
 export interface User {
   id: number;

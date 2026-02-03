@@ -83,16 +83,6 @@ export const TranscriptionCard: React.FC<TranscriptionCardProps> = ({ transcript
     }
   };
 
-  const getWorkflowStatus = () => {
-    const status = transcription.workflow_status || 'transcribed';
-    const steps = [
-      { key: 'transcribed', label: 'Transcripción', completed: true },
-      { key: 'note_generated', label: 'Nota Médica', completed: status !== 'transcribed' },
-      { key: 'codes_suggested', label: 'Códigos', completed: ['codes_suggested', 'form_created'].includes(status) },
-      { key: 'form_created', label: 'CMS-1500', completed: status === 'form_created' },
-    ];
-    return steps;
-  };
 
   return (
     <div className="card hover:shadow-xl transition-all duration-200">

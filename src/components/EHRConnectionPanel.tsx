@@ -12,6 +12,12 @@ interface EHRConnectionPanelProps {
   onConnectionSelect?: (connection: EHRConnection) => void;
 }
 
+// Extend EHRConnection type to include OAuth fields that may be present
+interface EHRConnectionWithAuth extends EHRConnection {
+  access_token?: string | null;
+  client_id?: string | null;
+}
+
 const SUPPORTED_EHRS = [
   {
     provider: 'eclinicalworks',
@@ -51,7 +57,7 @@ const SUPPORTED_EHRS = [
   }
 ];
 
-export default function EHRConnectionPanel({ onConnectionSelect }: EHRConnectionPanelProps) {
+export default function EHRConnectionPanel({}: EHRConnectionPanelProps) {
   const [connections, setConnections] = useState<EHRConnection[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAddForm, setShowAddForm] = useState(false);
@@ -285,7 +291,7 @@ export default function EHRConnectionPanel({ onConnectionSelect }: EHRConnection
                 )}
               </div>
               <div className="flex gap-2">
-                {!connection.access_token && connection.client_id && (
+                {!(connection as EHRConnectionWithAuth).access_token && (connection as EHRConnectionWithAuth).client_id && (
                   <Button
                     onClick={() => handleAuthorize(connection)}
                     className="bg-blue-600 hover:bg-blue-700"
@@ -293,7 +299,7 @@ export default function EHRConnectionPanel({ onConnectionSelect }: EHRConnection
                     Autorizar
                   </Button>
                 )}
-                {connection.access_token && (
+                {(connection as EHRConnectionWithAuth).access_token && (
                   <span className="text-sm text-green-600 px-3 py-1 bg-green-50 rounded">
                     ✓ Autorizada
                   </span>

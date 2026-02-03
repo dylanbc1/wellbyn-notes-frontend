@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
-import { FaSync, FaInbox, FaTrash } from 'react-icons/fa';
-import { getTranscriptions, deleteTranscription, getTranscription } from '../services/api';
+import { FaSync, FaInbox } from 'react-icons/fa';
+import { getTranscriptions, deleteTranscription } from '../services/api';
 import { TranscriptionCard } from '../components/TranscriptionCard';
 import type { Transcription } from '../types';
 import Button from '../components/Button';

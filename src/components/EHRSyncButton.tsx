@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { 
   getEHRConnections, 
   syncTranscriptionToEHR, 
@@ -31,7 +31,7 @@ export default function EHRSyncButton({ transcription, onSyncComplete }: EHRSync
   const loadConnections = async () => {
     try {
       const response = await getEHRConnections(0, 100, true);
-      setConnections(response.items.filter(c => c.is_active && c.access_token));
+      setConnections(response.items.filter(c => c.is_active));
     } catch (error) {
       console.error('Error loading connections:', error);
     }

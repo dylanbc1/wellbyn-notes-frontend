@@ -18,12 +18,10 @@ export const TranscriptionPanel: React.FC<TranscriptionPanelProps> = ({
   onTranscriptionComplete,
   onWorkflowStart,
   onWorkflowComplete,
-  onTranscriptionUpdate,
 }) => {
   const { t, i18n } = useTranslation();
   const [isTranscribing, setIsTranscribing] = useState(false);
   const [isRunningWorkflow, setIsRunningWorkflow] = useState(false);
-  const [currentTranscription, setCurrentTranscription] = useState<Transcription | null>(null);
   const [patientName, setPatientName] = useState<string>('');
   const [error, setError] = useState<string | null>(null);
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
@@ -155,7 +153,6 @@ export const TranscriptionPanel: React.FC<TranscriptionPanelProps> = ({
     }
     setUploadedFile(null);
     setUploadedAudioUrl(null);
-    setCurrentTranscription(null);
     clearTranscript();
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
@@ -173,7 +170,6 @@ export const TranscriptionPanel: React.FC<TranscriptionPanelProps> = ({
     try {
       // Transcribir audio
       const transcription = await transcribeAudio(fileToTranscribe);
-      setCurrentTranscription(transcription);
       onTranscriptionComplete(transcription);
       
       // Limpiar archivo/grabación después de transcribir (pero mantener la transcripción visible)
@@ -201,7 +197,6 @@ export const TranscriptionPanel: React.FC<TranscriptionPanelProps> = ({
       try {
         const workflowResult = await runFullWorkflow(transcription.id);
         if (workflowResult.transcription) {
-          setCurrentTranscription(workflowResult.transcription);
           onWorkflowComplete(workflowResult.transcription);
         }
       } catch (workflowError: any) {
@@ -410,7 +405,6 @@ export const TranscriptionPanel: React.FC<TranscriptionPanelProps> = ({
                         clearUploadedFile();
                       } else {
                         clearRecording();
-                        setCurrentTranscription(null);
                       }
                     }}
                     disabled={isTranscribing || isRunningWorkflow}

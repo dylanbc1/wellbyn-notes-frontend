@@ -92,7 +92,6 @@ export const WorkflowResultsPanel: React.FC<WorkflowResultsPanelProps> = ({
   const getWorkflowStatus = () => {
     if (!transcription) return [];
     
-    const status = transcription.workflow_status || 'transcribed';
     const steps = [
       { key: 'transcribed', label: t('workflow.steps.transcription'), completed: true, icon: FaCheckCircle },
       { 

@@ -22,16 +22,22 @@ npm install
 
 This may take a few minutes on the first run.
 
-### 3. Configure Environment (Optional)
+### 3. Configure Environment
 
-If your backend is running at a different URL:
+Create a `.env` file in the `notes-frontend` directory:
 
 ```bash
-# Create .env file
-echo "VITE_API_URL=http://your-backend-url:port" > .env
+# Copy the example file
+cp .env.example .env
+
+# Or create manually
+echo "VITE_API_URL=http://localhost:8000" > .env
 ```
 
-The default backend URL is `http://localhost:8000`.
+**Important:** 
+- For local development, use `http://localhost:8000` (default)
+- For production, update `VITE_API_URL` with your deployed backend URL (e.g., `https://api.tudominio.com`)
+- The `.env` file is already in `.gitignore` and won't be committed to the repository
 
 ## Running in Development Mode
 
@@ -186,15 +192,15 @@ server: {
 
 ### Change Backend URL
 
-Option 1 - Environment variable:
+**Recommended:** Use environment variable (`.env` file):
 ```bash
-echo "VITE_API_URL=http://my-backend.com" > .env
+# Edit .env file
+VITE_API_URL=http://my-backend.com
 ```
 
-Option 2 - Edit `src/services/api.ts`:
-```typescript
-const API_BASE_URL = 'http://my-backend.com';
-```
+**Note:** After changing `.env`, restart the development server for changes to take effect.
+
+The code in `src/services/api.ts` already uses `import.meta.env.VITE_API_URL` with a fallback to `http://localhost:8000`.
 
 ## Features
 

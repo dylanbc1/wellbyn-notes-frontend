@@ -1,4 +1,3 @@
-import React from 'react';
 import EHRConnectionPanel from '../components/EHRConnectionPanel';
 
 export const EHRConfig = () => {

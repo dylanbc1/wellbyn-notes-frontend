@@ -23,20 +23,28 @@ A React-based web application for audio transcription with a clean and intuitive
 # Install dependencies
 npm install
 
-# Configure environment variables (optional)
+# Configure environment variables
 cp .env.example .env
 # Edit .env if your backend is at a different URL
 ```
 
 ## Configuration
 
-If your backend is running at a different URL, create a `.env` file:
+The frontend uses environment variables to connect to the backend. Create a `.env` file in the root directory:
 
 ```env
-VITE_API_URL=http://your-backend-url:port
+# For local development
+VITE_API_URL=http://localhost:8000
+
+# For production (update with your backend URL)
+# VITE_API_URL=https://api.tudominio.com
 ```
 
-By default, the frontend connects to `http://localhost:8000`.
+**Important:**
+- The `.env` file is already in `.gitignore` and won't be committed
+- For local development, use `http://localhost:8000` (default)
+- For production, update `VITE_API_URL` with your deployed backend URL
+- After changing `.env`, restart the development server
 
 ## Usage
 
