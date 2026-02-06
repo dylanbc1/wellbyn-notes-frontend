@@ -11,6 +11,7 @@ export const Login = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [fullName, setFullName] = useState('');
+  const [role, setRole] = useState<'doctor' | 'administrator'>('doctor');
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -24,9 +25,28 @@ export const Login = () => {
     setSuccess(null);
     setIsLoading(true);
 
+    console.log('📝 Form submitted:', {
+      isRegisterMode,
+      email,
+      fullName: isRegisterMode ? fullName : 'N/A',
+      role: isRegisterMode ? role : 'N/A',
+      passwordLength: password.length
+    });
+
     try {
       if (isRegisterMode) {
-        await register({ email, full_name: fullName, password });
+        console.log('🚀 Attempting registration with:', {
+          email,
+          full_name: fullName,
+          role,
+          passwordLength: password.length
+        });
+        
+        const registerData = { email, full_name: fullName, password, role };
+        console.log('📦 Register data to send:', { ...registerData, password: '***' });
+        
+        await register(registerData);
+        console.log('✅ Registration successful!');
         setSuccess(t('auth.registerSuccess'));
         // Cambiar a modo login después de 2 segundos
         setTimeout(() => {
@@ -38,6 +58,17 @@ export const Login = () => {
         navigate('/');
       }
     } catch (err: any) {
+      console.error('❌ Form submission error:', {
+        error: err,
+        message: err.message,
+        response: err.response,
+        status: err.response?.status,
+        statusText: err.response?.statusText,
+        data: err.response?.data,
+        config: err.config,
+        requestURL: err.request?.responseURL
+      });
+      
       setError(
         isRegisterMode
           ? err.response?.data?.detail || t('auth.registerError')
@@ -151,6 +182,42 @@ export const Login = () => {
               </div>
             </div>
 
+            {/* Role Selection (solo en modo registro, para desarrollo) */}
+            {isRegisterMode && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Role (Development Only)
+                </label>
+                <div className="flex space-x-4">
+                  <label className="flex items-center space-x-2 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="role"
+                      value="doctor"
+                      checked={role === 'doctor'}
+                      onChange={(e) => setRole(e.target.value as 'doctor' | 'administrator')}
+                      className="w-4 h-4 text-blue-600 focus:ring-blue-500 border-gray-300"
+                    />
+                    <span className="text-sm text-gray-700">Doctor</span>
+                  </label>
+                  <label className="flex items-center space-x-2 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="role"
+                      value="administrator"
+                      checked={role === 'administrator'}
+                      onChange={(e) => setRole(e.target.value as 'doctor' | 'administrator')}
+                      className="w-4 h-4 text-blue-600 focus:ring-blue-500 border-gray-300"
+                    />
+                    <span className="text-sm text-gray-700">Administrator</span>
+                  </label>
+                </div>
+                <p className="mt-1 text-xs text-gray-500">
+                  Solo para desarrollo - permite seleccionar el tipo de usuario
+                </p>
+              </div>
+            )}
+
             {/* Submit Button */}
             <button
               type="submit"
@@ -178,6 +245,7 @@ export const Login = () => {
                 setEmail('');
                 setPassword('');
                 setFullName('');
+                setRole('doctor');
               }}
               className="text-sm text-blue-600 hover:text-blue-700 font-medium transition-colors"
             >

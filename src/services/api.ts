@@ -20,6 +20,12 @@ import type {
 // Configuración de la API
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
+console.log('🔧 API Configuration:', {
+  VITE_API_URL: import.meta.env.VITE_API_URL,
+  API_BASE_URL,
+  finalBaseURL: API_BASE_URL
+});
+
 const api = axios.create({
   baseURL: API_BASE_URL,
   headers: {
@@ -33,13 +39,46 @@ api.interceptors.request.use((config) => {
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
   }
+  
+  // Log detallado de la petición
+  const fullUrl = `${config.baseURL}${config.url}`;
+  console.log('📤 API Request:', {
+    method: config.method?.toUpperCase(),
+    url: config.url,
+    baseURL: config.baseURL,
+    fullURL: fullUrl,
+    data: config.data,
+    headers: config.headers
+  });
+  
   return config;
 });
 
 // Interceptor para manejar errores de autenticación
 api.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    console.log('✅ API Response:', {
+      status: response.status,
+      statusText: response.statusText,
+      url: response.config.url,
+      fullURL: `${response.config.baseURL}${response.config.url}`,
+      data: response.data
+    });
+    return response;
+  },
   (error) => {
+    console.error('❌ API Error:', {
+      message: error.message,
+      status: error.response?.status,
+      statusText: error.response?.statusText,
+      url: error.config?.url,
+      baseURL: error.config?.baseURL,
+      fullURL: error.config ? `${error.config.baseURL}${error.config.url}` : 'N/A',
+      requestURL: error.request?.responseURL,
+      responseData: error.response?.data,
+      responseHeaders: error.response?.headers
+    });
+    
     if (error.response?.status === 401) {
       // Token expirado o inválido
       localStorage.removeItem('auth_token');
@@ -79,9 +118,29 @@ export const register = async (userData: {
   email: string;
   full_name: string;
   password: string;
+  role?: 'doctor' | 'administrator';
 }): Promise<User> => {
-  const response = await api.post<User>('/api/auth/register', userData);
-  return response.data;
+  console.log('🔐 Register function called with:', {
+    userData: { ...userData, password: '***' }, // No loguear password completo
+    apiBaseURL: API_BASE_URL,
+    endpoint: '/api/auth/register',
+    fullURL: `${API_BASE_URL}/api/auth/register`
+  });
+  
+  try {
+    const response = await api.post<User>('/api/auth/register', userData);
+    console.log('✅ Register successful:', response.data);
+    return response.data;
+  } catch (error: any) {
+    console.error('❌ Register failed:', {
+      error,
+      message: error.message,
+      response: error.response,
+      status: error.response?.status,
+      data: error.response?.data
+    });
+    throw error;
+  }
 };
 
 // Health Check
