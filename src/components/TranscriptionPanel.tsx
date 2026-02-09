@@ -40,14 +40,15 @@ export const TranscriptionPanel: React.FC<TranscriptionPanelProps> = ({
     disconnect: disconnectDeepgram,
     sendAudio,
     clearTranscript,
+    isReady: isDeepgramReady,
   } = useDeepgramStreaming();
   
   // Callback para enviar audio PCM raw al WebSocket de Deepgram
   const handleAudioData = useCallback((data: ArrayBuffer) => {
-    if (isDeepgramConnected) {
+    if (isDeepgramReady()) {
       sendAudio(data);
     }
-  }, [isDeepgramConnected, sendAudio]);
+  }, [sendAudio, isDeepgramReady]);
   
   // Streaming recorder hook - captures raw PCM audio
   const {
@@ -60,12 +61,19 @@ export const TranscriptionPanel: React.FC<TranscriptionPanelProps> = ({
     stopRecording: originalStopRecording,
     pauseRecording,
     resumeRecording,
-    clearRecording,
+    clearRecording: originalClearRecording,
     error: recorderError,
   } = useStreamingRecorder({
     onAudioData: handleAudioData,
     sampleRate: 16000, // 16kHz for Deepgram
   });
+  
+  // Wrapper para clearRecording que también limpia la transcripción
+  const clearRecording = useCallback(() => {
+    clearTranscript();
+    disconnectDeepgram();
+    originalClearRecording();
+  }, [originalClearRecording, clearTranscript, disconnectDeepgram]);
   
   // Auto-scroll when transcript updates
   useEffect(() => {
@@ -76,31 +84,35 @@ export const TranscriptionPanel: React.FC<TranscriptionPanelProps> = ({
 
   // Start recording with Deepgram streaming
   const startRecording = useCallback(async () => {
-    console.log('🎬 Iniciando nueva grabación con Deepgram streaming...');
-    clearTranscript(); // Limpiar transcripción anterior
-    setError(null);
-    
-    // Conectar a Deepgram primero
-    console.log('🔌 Conectando a Deepgram...');
-    const connected = await connectDeepgram();
-    
-    if (!connected) {
-      setError(t('transcription.deepgramConnectionError'));
-      console.error('❌ Error conectando a Deepgram');
-      return;
+    try {
+      clearTranscript(); // Limpiar transcripción anterior
+      setError(null);
+      
+      // Conectar a Deepgram primero
+      if (typeof connectDeepgram !== 'function') {
+        setError('Error: función de conexión no disponible');
+        return;
+      }
+      
+      const connected = await connectDeepgram();
+      
+      if (!connected) {
+        setError(t('transcription.deepgramConnectionError'));
+        return;
+      }
+      
+      // Iniciar grabación
+      await originalStartRecording();
+    } catch (error: any) {
+      console.error('Error al iniciar la grabación:', error);
+      setError('Error al iniciar la grabación: ' + (error?.message || 'Unknown'));
     }
-    
-    console.log('✅ Deepgram conectado, iniciando grabación...');
-    await originalStartRecording();
-    console.log('✅ Grabación iniciada');
-  }, [originalStartRecording, connectDeepgram, clearTranscript]);
+  }, [originalStartRecording, connectDeepgram, clearTranscript, t]);
   
   // Stop recording and disconnect from Deepgram
   const stopRecording = useCallback(() => {
-    console.log('🛑 Deteniendo grabación...');
     originalStopRecording();
     disconnectDeepgram();
-    console.log('✅ Grabación detenida');
   }, [originalStopRecording, disconnectDeepgram]);
 
   const formatTime = (seconds: number): string => {
@@ -147,17 +159,18 @@ export const TranscriptionPanel: React.FC<TranscriptionPanelProps> = ({
     setUploadedAudioUrl(url);
   };
 
-  const clearUploadedFile = () => {
+  const clearUploadedFile = useCallback(() => {
     if (uploadedAudioUrl) {
       URL.revokeObjectURL(uploadedAudioUrl);
     }
     setUploadedFile(null);
     setUploadedAudioUrl(null);
     clearTranscript();
+    disconnectDeepgram();
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
-  };
+  }, [uploadedAudioUrl, clearTranscript, disconnectDeepgram]);
 
   const handleTranscribe = async () => {
     const fileToTranscribe = uploadedFile || (audioBlob ? new File([audioBlob], 'recording.webm', { type: audioBlob.type }) : null);
@@ -465,13 +478,30 @@ export const TranscriptionPanel: React.FC<TranscriptionPanelProps> = ({
             {(realtimeText || interimTranscript) ? (
               <div className="relative">
                 <p className="text-[#0C1523] leading-relaxed whitespace-pre-wrap text-sm transition-opacity duration-200">
-                  {realtimeText}
-                  {/* Show interim transcript (word being typed) in different style */}
-                  {interimTranscript && (
-                    <span className="text-[#5FA9DF] opacity-70"> {interimTranscript}</span>
+                  {/* When there's an interim transcript, it contains the full text up to now, so show it */}
+                  {/* When there's no interim, show the final transcript */}
+                  {interimTranscript ? (
+                    <>
+                      {/* Show the interim transcript (includes all text up to current moment) */}
+                      <span className="text-[#0C1523]">{realtimeText}</span>
+                      {/* Show only the new part being typed (interim minus what's already final) */}
+                      {interimTranscript.startsWith(realtimeText) ? (
+                        <span className="text-[#5FA9DF] opacity-80 font-medium">
+                          {interimTranscript.substring(realtimeText.length)}
+                        </span>
+                      ) : (
+                        <span className="text-[#5FA9DF] opacity-80 font-medium">
+                          {interimTranscript}
+                        </span>
+                      )}
+                    </>
+                  ) : (
+                    /* No interim, just show final transcript */
+                    realtimeText
                   )}
+                  {/* Show blinking cursor when recording */}
                   {isRecording && isDeepgramConnected && (
-                    <span className="inline-block ml-1 animate-pulse text-[#5FA9DF]">▊</span>
+                    <span className="inline-block ml-1 animate-pulse text-[#5FA9DF] font-bold">▊</span>
                   )}
                 </p>
                 {/* Auto-scroll al final cuando hay nuevo texto */}

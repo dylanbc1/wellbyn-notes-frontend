@@ -10,6 +10,7 @@ interface UseDeepgramStreamingReturn {
   disconnect: () => void;
   sendAudio: (data: ArrayBuffer | Blob) => void;
   clearTranscript: () => void;
+  isReady: () => boolean; // Función para verificar si está listo de forma síncrona
 }
 
 // Construir URL del WebSocket usando la misma URL base que la API
@@ -33,61 +34,73 @@ export const useDeepgramStreaming = (): UseDeepgramStreamingReturn => {
   const [error, setError] = useState<string | null>(null);
   
   const wsRef = useRef<WebSocket | null>(null);
-  const reconnectAttemptsRef = useRef(0);
-  const maxReconnectAttempts = 3;
+  const isConnectedRef = useRef(false); // Ref para verificación síncrona
   
   const connect = useCallback(async (): Promise<boolean> => {
-    if (wsRef.current?.readyState === WebSocket.OPEN) {
-      console.log('WebSocket already connected');
+    // Verificar usando ref para evitar problemas de estado asíncrono
+    if (wsRef.current?.readyState === WebSocket.OPEN && isConnectedRef.current) {
       return true;
     }
     
+    // Close existing connection if any
+    if (wsRef.current) {
+      wsRef.current.close();
+      wsRef.current = null;
+    }
+    
+    isConnectedRef.current = false; // Reset ref
     setIsConnecting(true);
     setError(null);
+    setIsConnected(false);
     
     return new Promise((resolve) => {
+      let resolved = false;
+      let connectionTimeout: ReturnType<typeof setTimeout> | null = null;
+      
       try {
-        console.log('🔌 Connecting to WebSocket:', WS_URL);
         const ws = new WebSocket(WS_URL);
         
         ws.onopen = () => {
-          console.log('✅ WebSocket connection opened');
-          // Wait for "connected" message from server
+          // Waiting for "connected" message from server
         };
         
         ws.onmessage = (event) => {
           try {
             const data = JSON.parse(event.data);
-            console.log('📩 WebSocket message:', data.type, data.text?.substring(0, 50) || '');
             
             switch (data.type) {
               case 'connected':
-                console.log('✅ Deepgram connected');
+                isConnectedRef.current = true;
                 setIsConnected(true);
                 setIsConnecting(false);
-                reconnectAttemptsRef.current = 0;
-                resolve(true);
+                if (connectionTimeout) clearTimeout(connectionTimeout);
+                if (!resolved) {
+                  resolved = true;
+                  resolve(true);
+                }
                 break;
                 
               case 'transcript':
                 if (data.is_final) {
-                  // Final transcript - append to main transcript
                   setTranscript(prev => {
-                    const newText = data.text.trim();
+                    const newText = data.text?.trim() || '';
                     if (!newText) return prev;
-                    // Add space if there's existing text
                     return prev ? `${prev} ${newText}` : newText;
                   });
                   setInterimTranscript('');
                 } else {
-                  // Interim transcript - show as preview
                   setInterimTranscript(data.text || '');
                 }
                 break;
                 
               case 'error':
-                console.error('❌ Deepgram error:', data.message);
                 setError(data.message);
+                setIsConnecting(false);
+                if (connectionTimeout) clearTimeout(connectionTimeout);
+                if (!resolved) {
+                  resolved = true;
+                  resolve(false);
+                }
                 break;
             }
           } catch (e) {
@@ -95,37 +108,44 @@ export const useDeepgramStreaming = (): UseDeepgramStreamingReturn => {
           }
         };
         
-        ws.onerror = (event) => {
-          console.error('❌ WebSocket error:', event);
+        ws.onerror = () => {
           setError('WebSocket connection error');
           setIsConnecting(false);
-          resolve(false);
+          if (connectionTimeout) clearTimeout(connectionTimeout);
+          if (!resolved) {
+            resolved = true;
+            resolve(false);
+          }
         };
         
-        ws.onclose = (event) => {
-          console.log('🔌 WebSocket closed:', event.code, event.reason);
+        ws.onclose = () => {
           setIsConnected(false);
           setIsConnecting(false);
-          wsRef.current = null;
+          if (wsRef.current === ws) {
+            wsRef.current = null;
+          }
+          if (connectionTimeout) clearTimeout(connectionTimeout);
           
-          // If not a clean close and we haven't exceeded attempts, could reconnect
-          if (event.code !== 1000 && reconnectAttemptsRef.current < maxReconnectAttempts) {
-            console.log('Connection closed unexpectedly');
+          if (!resolved) {
+            resolved = true;
+            resolve(false);
           }
         };
         
         wsRef.current = ws;
         
-        // Timeout for connection
-        setTimeout(() => {
-          if (!isConnected && isConnecting) {
-            console.error('WebSocket connection timeout');
+        // Timeout for connection (15 seconds)
+        connectionTimeout = setTimeout(() => {
+          if (!resolved) {
             setError('Connection timeout');
             setIsConnecting(false);
-            ws.close();
+            if (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING) {
+              ws.close();
+            }
+            resolved = true;
             resolve(false);
           }
-        }, 10000);
+        }, 15000);
         
       } catch (e) {
         console.error('Error creating WebSocket:', e);
@@ -134,43 +154,75 @@ export const useDeepgramStreaming = (): UseDeepgramStreamingReturn => {
         resolve(false);
       }
     });
-  }, [isConnected, isConnecting]);
+  }, []);
   
   const disconnect = useCallback(() => {
     if (wsRef.current) {
-      console.log('🔌 Disconnecting WebSocket');
-      
-      // Send stop message
       if (wsRef.current.readyState === WebSocket.OPEN) {
         wsRef.current.send(JSON.stringify({ type: 'stop' }));
       }
-      
       wsRef.current.close(1000, 'Client disconnect');
       wsRef.current = null;
     }
+    isConnectedRef.current = false;
     setIsConnected(false);
     setInterimTranscript('');
   }, []);
   
   const sendAudio = useCallback((data: ArrayBuffer | Blob) => {
-    if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
-      console.warn('Cannot send audio: WebSocket not connected');
+    // Verificar estado del WebSocket usando ref para verificación síncrona
+    const ws = wsRef.current;
+    const wsReady = ws && ws.readyState === WebSocket.OPEN;
+    const connected = isConnectedRef.current; // Usar ref en lugar de state
+    
+    if (!wsReady) {
+      console.warn('⚠️ Cannot send audio: WebSocket not ready', {
+        wsExists: !!ws,
+        readyState: ws?.readyState,
+        OPEN: WebSocket.OPEN,
+        connected,
+        expectedState: 'OPEN (1)'
+      });
       return;
     }
     
-    if (data instanceof Blob) {
-      // Convert Blob to ArrayBuffer
-      data.arrayBuffer().then(buffer => {
-        wsRef.current?.send(buffer);
+    if (!connected) {
+      console.warn('⚠️ Cannot send audio: Deepgram not connected (ref)', {
+        connected,
+        wsReady
       });
-    } else {
-      wsRef.current.send(data);
+      return;
     }
-  }, []);
+    
+    const sendData = async () => {
+      try {
+        let buffer: ArrayBuffer;
+        
+        if (data instanceof Blob) {
+          buffer = await data.arrayBuffer();
+        } else {
+          buffer = data;
+        }
+        
+        ws.send(buffer);
+      } catch (error) {
+        console.error('Error sending audio:', error);
+      }
+    };
+    
+    sendData();
+  }, []); // No dependencias - usamos refs para verificación síncrona
   
   const clearTranscript = useCallback(() => {
     setTranscript('');
     setInterimTranscript('');
+  }, []);
+  
+  // Función para verificar si está listo de forma síncrona (usa refs)
+  const isReady = useCallback(() => {
+    const wsReady = wsRef.current?.readyState === WebSocket.OPEN;
+    const connected = isConnectedRef.current;
+    return wsReady && connected;
   }, []);
   
   // Cleanup on unmount
@@ -192,5 +244,6 @@ export const useDeepgramStreaming = (): UseDeepgramStreamingReturn => {
     disconnect,
     sendAudio,
     clearTranscript,
+    isReady,
   };
 };

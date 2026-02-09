@@ -100,7 +100,7 @@ export const useStreamingRecorder = (options: UseStreamingRecorderOptions): UseS
       const stream = await navigator.mediaDevices.getUserMedia({
         audio: {
           channelCount: 1,
-          sampleRate: 48000, // Browser native, we'll downsample
+          sampleRate: sampleRate, // Use target sample rate directly
           echoCancellation: true,
           noiseSuppression: true,
           autoGainControl: true,
@@ -171,8 +171,6 @@ export const useStreamingRecorder = (options: UseStreamingRecorderOptions): UseS
         }
       }, 1000);
       
-      console.log('🎤 Streaming recording started (PCM 16kHz)');
-      
     } catch (err) {
       console.error('Error starting streaming recording:', err);
       setError('No se pudo acceder al micrófono. Por favor, verifica los permisos.');
@@ -180,7 +178,6 @@ export const useStreamingRecorder = (options: UseStreamingRecorderOptions): UseS
   }, [onAudioData, sampleRate, createWorkletProcessor]);
 
   const stopRecording = useCallback(() => {
-    console.log('🛑 Stopping streaming recording');
     
     // Stop timer
     if (timerRef.current) {
@@ -229,8 +226,6 @@ export const useStreamingRecorder = (options: UseStreamingRecorderOptions): UseS
       if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
         mediaRecorderRef.current.pause();
       }
-      
-      console.log('⏸️ Recording paused');
     }
   }, [isRecording, isPaused]);
 
@@ -243,8 +238,6 @@ export const useStreamingRecorder = (options: UseStreamingRecorderOptions): UseS
       if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'paused') {
         mediaRecorderRef.current.resume();
       }
-      
-      console.log('▶️ Recording resumed');
     }
   }, [isRecording, isPaused]);
 
