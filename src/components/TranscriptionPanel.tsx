@@ -251,11 +251,11 @@ export const TranscriptionPanel: React.FC<TranscriptionPanelProps> = ({
       )}
 
       {/* Recording Controls */}
-      <div className="flex-1 flex flex-col min-h-0">
+      <div className="flex-1 flex flex-col min-h-0 overflow-y-auto">
         {!isRecording && !audioBlob && !uploadedFile ? (
           /* Idle: card blanca, centrada */
           <div className="flex-1 flex flex-col justify-center">
-            <div className="rounded-2xl bg-white border border-[#E0F2FF] shadow-sm p-8 md:p-10 flex flex-col items-center max-w-md mx-auto w-full relative z-10">
+            <div className="rounded-2xl bg-white border border-[#E0F2FF] shadow-sm p-8 md:p-10 flex flex-col items-center max-w-md mx-auto w-full">
               {/* Nombre del paciente + Fecha: alineados, misma altura, mismo tipo y tamaño */}
               <div className="grid grid-cols-2 gap-6 w-full mb-8 items-start">
                 <div className="flex flex-col gap-1.5 min-w-0">
@@ -331,7 +331,7 @@ export const TranscriptionPanel: React.FC<TranscriptionPanelProps> = ({
           </div>
         ) : (
           /* Grabando o con audio: controles + Estado */
-          <div className="flex flex-col items-center space-y-6 mb-8 relative z-30">
+          <div className="flex flex-col items-center space-y-4 mb-4">
             {/* Estado: tiempo, grabando/pausado, micro-copy empático */}
             <div className="w-full max-w-md rounded-xl bg-white border border-[#E0F2FF] p-4 shadow-sm text-center">
               {isRecording && (
@@ -359,18 +359,16 @@ export const TranscriptionPanel: React.FC<TranscriptionPanelProps> = ({
             </div>
 
             {isRecording && (
-              <div className="flex items-center space-x-5 relative z-40">
+              <div className="flex items-center space-x-5">
                 <button
                   onClick={isPaused ? resumeRecording : pauseRecording}
-                  className="w-20 h-20 rounded-full bg-yellow-500 text-white flex items-center justify-center shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-200 relative z-40"
-                  style={{ position: 'relative', zIndex: 40 }}
+                  className="w-20 h-20 rounded-full bg-yellow-500 text-white flex items-center justify-center shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-200"
                 >
                   {isPaused ? <FaPlay className="text-3xl" /> : <FaPause className="text-3xl" />}
                 </button>
                 <button
                   onClick={stopRecording}
-                  className="w-28 h-28 rounded-full bg-[#0C1523] text-white flex items-center justify-center shadow-lg hover:shadow-2xl transform hover:scale-105 transition-all duration-200 relative z-40"
-                  style={{ position: 'relative', zIndex: 40 }}
+                  className="w-28 h-28 rounded-full bg-[#0C1523] text-white flex items-center justify-center shadow-lg hover:shadow-2xl transform hover:scale-105 transition-all duration-200"
                 >
                   <FaStop className="text-4xl" />
                 </button>
@@ -379,7 +377,7 @@ export const TranscriptionPanel: React.FC<TranscriptionPanelProps> = ({
 
             {/* Audio Player + Transcribir / Descartar */}
             {((audioUrl && !isRecording) || uploadedFile) && (
-              <div className="w-full max-w-md space-y-4 relative z-40">
+              <div className="w-full max-w-md space-y-4">
                 <div className="bg-[#F0F8FF] rounded-xl p-4 border border-[#E0F2FF]">
                   {uploadedFile && (
                     <div className="mb-3 pb-3 border-b border-[#E0F2FF]">
@@ -396,14 +394,13 @@ export const TranscriptionPanel: React.FC<TranscriptionPanelProps> = ({
                   <audio src={uploadedFile ? uploadedAudioUrl || '' : audioUrl || ''} controls className="w-full" />
                 </div>
 
-                <div className="flex space-x-3 relative z-40">
+                <div className="flex space-x-3">
                   <Button
                     onClick={handleTranscribe}
                     disabled={isTranscribing || isRunningWorkflow}
                     variant="blue"
                     fullWidth
-                    className="flex items-center justify-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed relative z-40"
-                    style={{ position: 'relative', zIndex: 40 }}
+                    className="flex items-center justify-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     {isTranscribing || isRunningWorkflow ? (
                       <>
@@ -425,8 +422,7 @@ export const TranscriptionPanel: React.FC<TranscriptionPanelProps> = ({
                     }}
                     disabled={isTranscribing || isRunningWorkflow}
                     variant="white"
-                    className="flex items-center justify-center space-x-2 disabled:opacity-50 relative z-40"
-                    style={{ position: 'relative', zIndex: 40 }}
+                    className="flex items-center justify-center space-x-2 disabled:opacity-50"
                   >
                     <FaTrash />
                     <span>{t('transcription.discard')}</span>
@@ -436,11 +432,10 @@ export const TranscriptionPanel: React.FC<TranscriptionPanelProps> = ({
             )}
           </div>
         )}
-      </div>
 
-      {/* Transcripción en tiempo real - Mostrar durante la grabación y después si hay texto */}
-      {(isRecording || realtimeText || interimTranscript || isDeepgramConnecting) && (
-        <div className="mb-6 p-4 bg-white rounded-xl border border-[#E0F2FF] shadow-sm transition-all duration-300 relative" style={{ zIndex: 1 }}>
+        {/* Transcripción en tiempo real - Mostrar durante la grabación y después si hay texto */}
+        {(isRecording || realtimeText || interimTranscript || isDeepgramConnecting) && (
+          <div className="mt-4 mb-4 p-4 bg-white rounded-xl border border-[#E0F2FF] shadow-sm transition-all duration-300 w-full max-w-md mx-auto">
           <div className="flex items-center space-x-2 mb-3">
             <div className="relative">
               {(isRecording || isDeepgramConnecting) && (
@@ -478,7 +473,7 @@ export const TranscriptionPanel: React.FC<TranscriptionPanelProps> = ({
             </div>
           )}
           
-          <div className="min-h-[150px] max-h-[300px] bg-white rounded-lg p-4 border border-[#E0F2FF] overflow-y-auto transition-all duration-200">
+          <div className="min-h-[120px] max-h-[250px] bg-white rounded-lg p-4 border border-[#E0F2FF] overflow-y-auto transition-all duration-200">
             {(realtimeText || interimTranscript) ? (
               <div className="relative">
                 <p className="text-[#0C1523] leading-relaxed whitespace-pre-wrap text-sm transition-opacity duration-200">
@@ -537,7 +532,8 @@ export const TranscriptionPanel: React.FC<TranscriptionPanelProps> = ({
             </div>
           )}
         </div>
-      )}
+        )}
+      </div>
 
     </div>
   );
