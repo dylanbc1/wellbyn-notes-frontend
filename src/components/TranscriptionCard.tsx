@@ -1,17 +1,21 @@
-import { useState } from 'react';
-import { 
-  FaTrash, FaClock, FaFileAudio, FaMicrochip, FaChevronDown, FaChevronUp,
-  FaFileMedical, FaCode, FaFileInvoice, FaCheckCircle, FaSpinner, FaPlay
+import { useState, useEffect } from 'react';
+import {
+  FaTrash, FaClock, FaChevronDown, FaChevronUp,
+  FaFileMedical, FaCode, FaFileInvoice, FaCheckCircle, FaSpinner, FaPlay,
+  FaUser, FaExclamationTriangle, FaFilePdf
 } from 'react-icons/fa';
-import type { Transcription, ICD10Code, CPTCode } from '../types';
+import type { Transcription, ICD10Code, CPTCode, PDFDocumentMeta } from '../types';
 import {
   generateMedicalNote,
   suggestICD10Codes,
   suggestCPTCodes,
   generateCMS1500Form,
   runFullWorkflow,
-  getTranscription
+  getTranscription,
+  downloadPDF,
+  getGeneratedPDFs
 } from '../services/api';
+import { useAuth } from '../contexts/AuthContext';
 import Button from './Button';
 
 interface TranscriptionCardProps {
@@ -24,6 +28,32 @@ export const TranscriptionCard: React.FC<TranscriptionCardProps> = ({ transcript
   const [isExpanded, setIsExpanded] = useState(false);
   const [isWorkflowExpanded, setIsWorkflowExpanded] = useState(false);
   const [loadingStep, setLoadingStep] = useState<string | null>(null);
+  const [availablePDFs, setAvailablePDFs] = useState<PDFDocumentMeta[]>([]);
+  const [downloadingPDF, setDownloadingPDF] = useState<string | null>(null);
+  const { isAdministrator } = useAuth();
+
+  // Fetch PDF metadata when the card has a medical note (PDFs may have been generated)
+  useEffect(() => {
+    if (transcription.medical_note) {
+      getGeneratedPDFs(transcription.id)
+        .then(data => setAvailablePDFs(data.pdfs))
+        .catch(() => {}); // Silently fail — PDFs are optional
+    }
+  }, [transcription.id, transcription.medical_note]);
+
+  const handleDownloadPDF = async (type: 'clinical-note' | 'billing-packet' | 'patient-summary') => {
+    setDownloadingPDF(type);
+    try {
+      await downloadPDF(transcription.id, type);
+      // Refresh PDF metadata after download (PDF is now cached)
+      const data = await getGeneratedPDFs(transcription.id);
+      setAvailablePDFs(data.pdfs);
+    } catch (error) {
+      console.error('Error downloading PDF:', error);
+    } finally {
+      setDownloadingPDF(null);
+    }
+  };
 
   const formatDate = (dateString: string): string => {
     const date = new Date(dateString);
@@ -89,24 +119,44 @@ export const TranscriptionCard: React.FC<TranscriptionCardProps> = ({ transcript
       {/* Header */}
       <div className="flex items-start justify-between mb-4">
         <div className="flex-1">
-          <div className="flex items-center space-x-2 mb-2">
-            <FaFileAudio className="text-[#5FA9DF]" />
-            <h3 className="font-semibold text-[#0C1523]">{transcription.filename}</h3>
-            <span className="text-xs bg-[#E0F2FF] text-[#246B8E] px-2 py-1 rounded-full">
-              ID: {transcription.id}
-            </span>
-          </div>
-          
-          <div className="flex items-center space-x-4 text-sm text-[#3C4147]">
-            <div className="flex items-center space-x-1">
-              <FaClock className="text-[#6B7280]" />
-              <span>{formatDate(transcription.created_at)}</span>
+          <div className="flex items-center space-x-3 mb-2">
+            <FaUser className="text-[#5FA9DF] text-xl" />
+            <div>
+              <h3 className="font-bold text-[#0C1523] text-lg">
+                {transcription.patient_context?.name ||
+                 transcription.patient_id ||
+                 'Paciente sin nombre'}
+              </h3>
+              <div className="flex items-center space-x-4 text-sm text-[#3C4147]">
+                <div className="flex items-center space-x-1">
+                  <FaClock className="text-[#6B7280]" />
+                  <span>{formatDate(transcription.visit_date || transcription.created_at)}</span>
+                </div>
+                {transcription.visit_duration_minutes && (
+                  <span className="text-[#6B7280]">• {transcription.visit_duration_minutes} min</span>
+                )}
+              </div>
             </div>
-            <div className="flex items-center space-x-1">
-              <FaMicrochip className="text-[#6B7280]" />
-              <span>{transcription.processing_time_seconds}s</span>
-            </div>
           </div>
+
+          {/* Show allergies if present */}
+          {transcription.patient_context?.allergies && transcription.patient_context.allergies.length > 0 && (
+            <div className="flex items-center gap-2 mt-2">
+              <FaExclamationTriangle className="text-red-500 text-sm" />
+              <div className="flex flex-wrap gap-1">
+                {transcription.patient_context.allergies.slice(0, 3).map((allergy: any, idx: number) => (
+                  <span key={idx} className="text-xs font-semibold text-red-600 bg-red-50 px-2 py-1 rounded-full">
+                    {allergy.name}
+                  </span>
+                ))}
+                {transcription.patient_context.allergies.length > 3 && (
+                  <span className="text-xs text-gray-500">
+                    +{transcription.patient_context.allergies.length - 3} más
+                  </span>
+                )}
+              </div>
+            </div>
+          )}
         </div>
 
         <button
@@ -359,6 +409,67 @@ export const TranscriptionCard: React.FC<TranscriptionCardProps> = ({ transcript
                   </>
                 )}
               </Button>
+            )}
+
+            {/* PDF Download Section */}
+            {transcription.medical_note && (
+              <div className="pt-3 border-t border-[#C7E7FF]">
+                <h4 className="text-sm font-semibold text-[#0C1523] mb-2 flex items-center gap-2">
+                  <FaFilePdf className="text-[#5FA9DF]" />
+                  <span>Documentos PDF</span>
+                </h4>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    onClick={() => handleDownloadPDF('clinical-note')}
+                    disabled={downloadingPDF === 'clinical-note'}
+                    className="flex items-center gap-1.5 text-xs bg-[#5FA9DF] hover:bg-[#4A9BCE] text-white px-3 py-2 rounded-lg transition-all disabled:opacity-50"
+                  >
+                    {downloadingPDF === 'clinical-note' ? (
+                      <FaSpinner className="animate-spin" />
+                    ) : (
+                      <FaFilePdf />
+                    )}
+                    <span>Nota Clínica</span>
+                    {availablePDFs.some(p => p.pdf_type === 'clinical-note') && (
+                      <span className="bg-white text-[#5FA9DF] text-xs px-1 rounded font-bold leading-none">✓</span>
+                    )}
+                  </button>
+
+                  <button
+                    onClick={() => handleDownloadPDF('patient-summary')}
+                    disabled={downloadingPDF === 'patient-summary'}
+                    className="flex items-center gap-1.5 text-xs bg-white hover:bg-gray-50 text-gray-700 border border-gray-300 px-3 py-2 rounded-lg transition-all disabled:opacity-50"
+                  >
+                    {downloadingPDF === 'patient-summary' ? (
+                      <FaSpinner className="animate-spin text-[#5FA9DF]" />
+                    ) : (
+                      <FaFilePdf className="text-[#5FA9DF]" />
+                    )}
+                    <span>Resumen Paciente</span>
+                    {availablePDFs.some(p => p.pdf_type === 'patient-summary') && (
+                      <span className="bg-[#5FA9DF] text-white text-xs px-1 rounded font-bold leading-none">✓</span>
+                    )}
+                  </button>
+
+                  {isAdministrator && transcription.icd10_codes && transcription.cpt_codes && (
+                    <button
+                      onClick={() => handleDownloadPDF('billing-packet')}
+                      disabled={downloadingPDF === 'billing-packet'}
+                      className="flex items-center gap-1.5 text-xs bg-white hover:bg-gray-50 text-gray-700 border border-gray-300 px-3 py-2 rounded-lg transition-all disabled:opacity-50"
+                    >
+                      {downloadingPDF === 'billing-packet' ? (
+                        <FaSpinner className="animate-spin text-[#5FA9DF]" />
+                      ) : (
+                        <FaFileInvoice className="text-[#5FA9DF]" />
+                      )}
+                      <span>Billing Packet</span>
+                      {availablePDFs.some(p => p.pdf_type === 'billing-packet') && (
+                        <span className="bg-[#5FA9DF] text-white text-xs px-1 rounded font-bold leading-none">✓</span>
+                      )}
+                    </button>
+                  )}
+                </div>
+              </div>
             )}
           </div>
         )}

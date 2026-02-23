@@ -1,7 +1,7 @@
 import axios from 'axios';
-import type { 
-  Transcription, 
-  TranscriptionListResponse, 
+import type {
+  Transcription,
+  TranscriptionListResponse,
   HealthCheck,
   WorkflowStepResponse,
   PatientInfo,
@@ -14,7 +14,9 @@ import type {
   EHRPatient,
   User,
   LoginRequest,
-  LoginResponse
+  LoginResponse,
+  PDFDocumentMeta,
+  NudgeItem
 } from '../types';
 
 // Configuración de la API
@@ -246,6 +248,85 @@ export const runFullWorkflow = async (
     `/api/transcriptions/${transcriptionId}/workflow/run-full`,
     patientInfo
   );
+  return response.data;
+};
+
+// ==================== PDF Export Endpoints ====================
+
+// Download PDF reports
+export const downloadPDF = async (
+  transcriptionId: number,
+  type: 'clinical-note' | 'billing-packet' | 'patient-summary'
+): Promise<void> => {
+  try {
+    console.log(`📥 Downloading PDF: ${type} for transcription ${transcriptionId}`);
+
+    const response = await api.get(
+      `/api/transcriptions/${transcriptionId}/pdf/${type}`,
+      {
+        responseType: 'blob', // Important: tell axios to expect binary data
+      }
+    );
+
+    console.log('✅ PDF received, size:', response.data.size);
+
+    // Create download link
+    const url = window.URL.createObjectURL(new Blob([response.data], { type: 'application/pdf' }));
+    const link = document.createElement('a');
+    link.href = url;
+
+    // Generate filename
+    const date = new Date().toISOString().split('T')[0];
+    const filename = `${type}_${transcriptionId}_${date}.pdf`;
+    link.setAttribute('download', filename);
+
+    // Trigger download
+    document.body.appendChild(link);
+    link.click();
+
+    // Cleanup
+    setTimeout(() => {
+      link.remove();
+      window.URL.revokeObjectURL(url);
+      console.log(`✅ PDF downloaded: ${filename}`);
+    }, 100);
+  } catch (error: any) {
+    console.error('❌ PDF download failed:', error);
+    console.error('Error details:', error.response?.data);
+    alert(`Error al descargar PDF: ${error.response?.data?.detail || error.message}`);
+    throw error;
+  }
+};
+
+// Get list of generated PDFs metadata for a transcription (no binary data)
+export const getGeneratedPDFs = async (transcriptionId: number): Promise<{
+  transcription_id: number;
+  pdfs: PDFDocumentMeta[];
+}> => {
+  const response = await api.get(`/api/transcriptions/${transcriptionId}/pdfs`);
+  return response.data;
+};
+
+// Map transcript text to SOAP sections (POST /{id}/soap/map-continuous)
+export const mapSOAPSections = async (
+  transcriptionId: number,
+  transcriptText: string
+): Promise<{ success: boolean; soap_sections: any; documentation_completeness: any }> => {
+  const response = await api.post(
+    `/api/transcriptions/${transcriptionId}/soap/map-continuous`,
+    null,
+    { params: { transcription_text: transcriptText } }
+  );
+  return response.data;
+};
+
+// Get live clarification nudges during recording (no transcription ID needed)
+export const getLiveSuggestions = async (
+  transcriptText: string
+): Promise<{ nudges: NudgeItem[] }> => {
+  const response = await api.post('/api/transcriptions/live-nudges', {
+    transcript_text: transcriptText,
+  });
   return response.data;
 };
 

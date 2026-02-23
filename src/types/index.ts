@@ -1,5 +1,43 @@
 // Types para la versión demo simplificada
 
+export interface SOAPSection {
+  text: string;
+  locked: boolean;
+}
+
+export interface SOAPSections {
+  subjective: SOAPSection;
+  objective: SOAPSection;
+  assessment: SOAPSection;
+  plan: SOAPSection;
+}
+
+export interface PatientContext {
+  name?: string;
+  dob?: string;
+  sex?: string;
+  allergies?: Array<{ name: string; severity?: string; [key: string]: any }>;
+  medications?: any[];
+  problems?: any[];
+  recent_visits?: any[];
+}
+
+export interface NudgeItem {
+  type: 'documentation' | 'diagnostic';
+  message: string;
+  category: string;
+  priority: 'high' | 'medium' | 'low';
+}
+
+export interface PDFDocumentMeta {
+  id: number;
+  transcription_id: number;
+  pdf_type: 'clinical-note' | 'billing-packet' | 'patient-summary';
+  filename: string;
+  file_size_bytes: number;
+  generated_at: string;
+}
+
 export interface ICD10Code {
   code: string;
   description: string;
@@ -61,6 +99,23 @@ export interface Transcription {
   cpt_codes?: CPTCode[] | null;
   cms1500_form_data?: CMS1500FormData | null;
   workflow_status: string;
+  soap_sections?: SOAPSections | null;
+  raw_transcript?: string | null;
+  documentation_completeness?: Record<string, string> | null;
+  final_note?: string | null;
+  note_format?: string | null;
+  doctor_approved?: boolean;
+  doctor_approved_at?: string | null;
+  doctor_id?: number | null;
+  coding_preview?: Record<string, any> | null;
+  patient_context?: PatientContext | null;
+  patient_id?: string | null;
+  visit_date?: string | null;
+  visit_duration_minutes?: number | null;
+  patient_summary?: string | null;
+  next_steps?: any[] | null;
+  share_token?: string | null;
+  share_expires_at?: string | null;
   created_at: string;
   updated_at?: string;
 }

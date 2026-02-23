@@ -1,9 +1,9 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
-import { FaMicrophoneAlt, FaStop, FaPause, FaPlay, FaTrash, FaFileUpload, FaSpinner } from 'react-icons/fa';
+import { FaMicrophoneAlt, FaStop, FaPause, FaPlay, FaTrash, FaFileUpload, FaSpinner, FaUser, FaClock, FaExclamationTriangle, FaQuestionCircle } from 'react-icons/fa';
 import { useStreamingRecorder } from '../hooks/useStreamingRecorder';
 import { useDeepgramStreaming } from '../hooks/useDeepgramStreaming';
-import { transcribeAudio, runFullWorkflow } from '../services/api';
-import type { Transcription } from '../types';
+import { transcribeAudio, runFullWorkflow, mapSOAPSections, getLiveSuggestions, getTranscription } from '../services/api';
+import type { Transcription, NudgeItem } from '../types';
 import Button from './Button';
 import { useTranslation } from 'react-i18next';
 
@@ -28,6 +28,12 @@ export const TranscriptionPanel: React.FC<TranscriptionPanelProps> = ({
   const [uploadedAudioUrl, setUploadedAudioUrl] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const scrollEndRef = useRef<HTMLDivElement>(null);
+
+  // Live suggestions state
+  const [liveSuggestions, setLiveSuggestions] = useState<NudgeItem[]>([]);
+  const [lastSuggestionWordCount, setLastSuggestionWordCount] = useState(0);
+  const [isFetchingSuggestions, setIsFetchingSuggestions] = useState(false);
+  const lastSuggestionTimeRef = useRef<number>(0);
   
   // Deepgram streaming hook for real-time transcription
   const {
@@ -68,11 +74,14 @@ export const TranscriptionPanel: React.FC<TranscriptionPanelProps> = ({
     sampleRate: 16000, // 16kHz for Deepgram
   });
   
-  // Wrapper para clearRecording que también limpia la transcripción
+  // Wrapper para clearRecording que también limpia la transcripción y sugerencias
   const clearRecording = useCallback(() => {
     clearTranscript();
     disconnectDeepgram();
     originalClearRecording();
+    setLiveSuggestions([]);
+    setLastSuggestionWordCount(0);
+    lastSuggestionTimeRef.current = 0;
   }, [originalClearRecording, clearTranscript, disconnectDeepgram]);
   
   // Auto-scroll when transcript updates
@@ -81,6 +90,27 @@ export const TranscriptionPanel: React.FC<TranscriptionPanelProps> = ({
       scrollEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
     }
   }, [realtimeText, interimTranscript]);
+
+  // Live suggestions: trigger every ~40 new words and at least 20s apart
+  useEffect(() => {
+    if (!isRecording || !realtimeText) return;
+
+    const words = realtimeText.trim().split(/\s+/).filter(Boolean);
+    const currentWordCount = words.length;
+    const wordsSinceLast = currentWordCount - lastSuggestionWordCount;
+    const secondsSinceLast = (Date.now() - lastSuggestionTimeRef.current) / 1000;
+
+    if (wordsSinceLast >= 40 && secondsSinceLast >= 20 && !isFetchingSuggestions) {
+      setIsFetchingSuggestions(true);
+      setLastSuggestionWordCount(currentWordCount);
+      lastSuggestionTimeRef.current = Date.now();
+
+      getLiveSuggestions(realtimeText)
+        .then(data => setLiveSuggestions(data.nudges))
+        .catch(() => {}) // Non-critical, silently ignore
+        .finally(() => setIsFetchingSuggestions(false));
+    }
+  }, [realtimeText, isRecording]);
 
   // Start recording with Deepgram streaming
   const startRecording = useCallback(async () => {
@@ -206,11 +236,21 @@ export const TranscriptionPanel: React.FC<TranscriptionPanelProps> = ({
       // Ejecutar workflow automáticamente
       setIsRunningWorkflow(true);
       onWorkflowStart();
-      
+
       try {
-        const workflowResult = await runFullWorkflow(transcription.id);
+        // Pasar información del paciente al workflow
+        const patientInfo = patientName ? { name: patientName } : undefined;
+        const workflowResult = await runFullWorkflow(transcription.id, patientInfo);
         if (workflowResult.transcription) {
           onWorkflowComplete(workflowResult.transcription);
+          // Generate SOAP sections then re-fetch to propagate soap_sections to parent
+          try {
+            await mapSOAPSections(workflowResult.transcription.id, workflowResult.transcription.text);
+            const updatedTranscription = await getTranscription(workflowResult.transcription.id);
+            onWorkflowComplete(updatedTranscription);
+          } catch (soapError) {
+            console.warn('SOAP mapping failed (non-critical):', soapError);
+          }
         }
       } catch (workflowError: any) {
         console.error('Error running workflow:', workflowError);
@@ -332,6 +372,26 @@ export const TranscriptionPanel: React.FC<TranscriptionPanelProps> = ({
         ) : (
           /* Grabando o con audio: controles + Estado */
           <div className="flex flex-col items-center space-y-4 mb-4">
+            {/* Patient Header Bar - shown during recording */}
+            {(isRecording || realtimeText) && patientName && (
+              <div className="w-full max-w-md sticky top-0 bg-blue-50 border border-blue-200 rounded-lg px-4 py-3 shadow-sm z-10">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-3">
+                    <FaUser className="text-blue-500" />
+                    <div>
+                      <h3 className="font-bold text-gray-900">{patientName}</h3>
+                    </div>
+                  </div>
+                  {isRecording && (
+                    <div className="text-sm text-gray-600 flex items-center gap-1">
+                      <FaClock />
+                      <span className="font-mono">{formatTime(recordingTime)}</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
             {/* Estado: tiempo, grabando/pausado, micro-copy empático */}
             <div className="w-full max-w-md rounded-xl bg-white border border-[#E0F2FF] p-4 shadow-sm text-center">
               {isRecording && (
@@ -529,6 +589,40 @@ export const TranscriptionPanel: React.FC<TranscriptionPanelProps> = ({
               <p className="text-[#0C1523] font-semibold">
                 {(realtimeText + ' ' + (interimTranscript || '')).trim().split(/\s+/).filter(w => w).length} {t('transcription.words')}
               </p>
+            </div>
+          )}
+
+          {/* Live Doctor Suggestions Panel */}
+          {isRecording && (liveSuggestions.length > 0 || isFetchingSuggestions) && (
+            <div className="mt-3 p-3 bg-amber-50 border border-amber-200 rounded-xl transition-all duration-300">
+              <div className="flex items-center gap-2 mb-2">
+                {isFetchingSuggestions ? (
+                  <FaSpinner className="animate-spin text-amber-500 text-sm flex-shrink-0" />
+                ) : (
+                  <FaQuestionCircle className="text-amber-500 text-sm flex-shrink-0" />
+                )}
+                <h4 className="text-sm font-semibold text-amber-800">
+                  {isFetchingSuggestions ? 'Analizando consulta...' : 'Sugerencias para el doctor'}
+                </h4>
+              </div>
+
+              {liveSuggestions.length > 0 && (
+                <div className="space-y-1.5">
+                  {liveSuggestions.slice(0, 4).map((nudge, idx) => (
+                    <div
+                      key={idx}
+                      className={`flex items-start gap-2 p-2 rounded-lg text-sm ${
+                        nudge.priority === 'high'
+                          ? 'bg-amber-100 border border-amber-300'
+                          : 'bg-white border border-amber-200'
+                      }`}
+                    >
+                      <FaQuestionCircle className="text-amber-400 flex-shrink-0 mt-0.5 text-xs" />
+                      <p className="text-amber-900 leading-snug text-xs">{nudge.message}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           )}
         </div>

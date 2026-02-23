@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
-import { FaFileMedical, FaCode, FaFileInvoice, FaCheckCircle, FaSpinner, FaClock, FaMicrophone } from 'react-icons/fa';
+import { FaFileMedical, FaCode, FaFileInvoice, FaCheckCircle, FaSpinner, FaClock, FaMicrophone, FaFilePdf, FaUser, FaChevronDown, FaChevronUp } from 'react-icons/fa';
 import type { Transcription, ICD10Code, CPTCode } from '../types';
 import { useAuth } from '../contexts/AuthContext';
 import EHRSyncButton from './EHRSyncButton';
 import { useTranslation } from 'react-i18next';
+import { downloadPDF } from '../services/api';
 
 interface WorkflowResultsPanelProps {
   transcription: Transcription | null;
@@ -20,7 +21,18 @@ export const WorkflowResultsPanel: React.FC<WorkflowResultsPanelProps> = ({
   const [editableIcd10Codes, setEditableIcd10Codes] = useState<ICD10Code[]>([]);
   const [editableCptCodes, setEditableCptCodes] = useState<CPTCode[]>([]);
   const [editableCms1500, setEditableCms1500] = useState<any>(null);
-  
+  const [downloadingPDF, setDownloadingPDF] = useState<string | null>(null);
+  const [soapExpanded, setSoapExpanded] = useState<Record<string, boolean>>({
+    subjective: true, objective: true, assessment: true, plan: true,
+  });
+
+  const soapConfig = {
+    subjective: { label: 'S — Subjetivo', bg: 'bg-blue-50', border: 'border-blue-200', header: 'bg-blue-100 text-blue-800' },
+    objective:  { label: 'O — Objetivo',  bg: 'bg-green-50', border: 'border-green-200', header: 'bg-green-100 text-green-800' },
+    assessment: { label: 'A — Evaluación', bg: 'bg-orange-50', border: 'border-orange-200', header: 'bg-orange-100 text-orange-800' },
+    plan:       { label: 'P — Plan',       bg: 'bg-purple-50', border: 'border-purple-200', header: 'bg-purple-100 text-purple-800' },
+  } as const;
+
   // Sincronizar los estados editables con la transcripción
   useEffect(() => {
     if (transcription) {
@@ -71,6 +83,19 @@ export const WorkflowResultsPanel: React.FC<WorkflowResultsPanelProps> = ({
       onTranscriptionUpdate({ ...transcription, cms1500_form_data: updated });
     }
   };
+
+  const handleDownloadPDF = async (type: 'clinical-note' | 'billing-packet' | 'patient-summary') => {
+    if (!transcription) return;
+    setDownloadingPDF(type);
+    try {
+      await downloadPDF(transcription.id, type);
+    } catch (error) {
+      console.error('Error downloading PDF:', error);
+    } finally {
+      setDownloadingPDF(null);
+    }
+  };
+
   const { isAdministrator } = useAuth();
   const { t } = useTranslation();
   if (!transcription && !isRunning) {
@@ -217,6 +242,96 @@ export const WorkflowResultsPanel: React.FC<WorkflowResultsPanelProps> = ({
             placeholder={t('workflow.medicalNotePlaceholder')}
             spellCheck={true}
           />
+
+          {/* PDF Download Buttons */}
+          <div className="mt-6 flex flex-wrap gap-3">
+            <button
+              onClick={() => handleDownloadPDF('clinical-note')}
+              disabled={downloadingPDF === 'clinical-note'}
+              className="flex items-center gap-2 bg-[#5FA9DF] hover:bg-[#4A9BCE] text-white font-semibold py-2 px-4 rounded-lg transition-all duration-200 shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {downloadingPDF === 'clinical-note' ? (
+                <FaSpinner className="text-lg animate-spin" />
+              ) : (
+                <FaFilePdf className="text-lg" />
+              )}
+              <span>{t('download_clinical_note')}</span>
+            </button>
+
+            {isAdministrator && transcription.icd10_codes && transcription.cpt_codes && (
+              <button
+                onClick={() => handleDownloadPDF('billing-packet')}
+                disabled={downloadingPDF === 'billing-packet'}
+                className="flex items-center gap-2 bg-white hover:bg-gray-50 text-gray-700 font-semibold py-2 px-4 rounded-lg border border-gray-300 transition-all duration-200 shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {downloadingPDF === 'billing-packet' ? (
+                  <FaSpinner className="text-lg animate-spin text-[#5FA9DF]" />
+                ) : (
+                  <FaFileInvoice className="text-lg text-[#5FA9DF]" />
+                )}
+                <span>{t('download_billing_packet')}</span>
+              </button>
+            )}
+
+            <button
+              onClick={() => handleDownloadPDF('patient-summary')}
+              disabled={downloadingPDF === 'patient-summary'}
+              className="flex items-center gap-2 bg-white hover:bg-gray-50 text-gray-700 font-semibold py-2 px-4 rounded-lg border border-gray-300 transition-all duration-200 shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {downloadingPDF === 'patient-summary' ? (
+                <FaSpinner className="text-lg animate-spin text-[#5FA9DF]" />
+              ) : (
+                <FaUser className="text-lg text-[#5FA9DF]" />
+              )}
+              <span>{t('download_patient_summary')}</span>
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* SOAP Sections */}
+      {transcription && (transcription.soap_sections || transcription.medical_note) && (
+        <div className="mb-6">
+          <div className="flex items-center space-x-2 mb-3">
+            <FaFileMedical className="text-[#5FA9DF]" />
+            <h3 className="text-lg font-semibold text-[#0C1523]">Secciones SOAP</h3>
+          </div>
+
+          {!transcription.soap_sections && transcription.medical_note && (
+            <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg text-yellow-700 text-sm">
+              Generando secciones SOAP... (disponibles tras el workflow)
+            </div>
+          )}
+
+          {transcription.soap_sections && (
+            <div className="space-y-2">
+              {(Object.keys(soapConfig) as Array<keyof typeof soapConfig>).map((key) => {
+                const config = soapConfig[key];
+                const section = transcription.soap_sections?.[key];
+                const isOpen = soapExpanded[key];
+                return (
+                  <div key={key} className={`rounded-xl border ${config.border} ${config.bg} overflow-hidden`}>
+                    <button
+                      onClick={() => setSoapExpanded(prev => ({ ...prev, [key]: !prev[key] }))}
+                      className={`w-full flex items-center justify-between px-4 py-2.5 ${config.header} font-semibold text-sm transition-colors`}
+                    >
+                      <span>{config.label}</span>
+                      {isOpen ? <FaChevronUp className="text-xs" /> : <FaChevronDown className="text-xs" />}
+                    </button>
+                    {isOpen && (
+                      <div className="px-4 py-3">
+                        {section?.text ? (
+                          <p className="text-[#0C1523] text-sm leading-relaxed whitespace-pre-wrap">{section.text}</p>
+                        ) : (
+                          <p className="text-gray-400 text-sm italic">Sin información en esta sección</p>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
       )}
 

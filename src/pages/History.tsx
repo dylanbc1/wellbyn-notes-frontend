@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { FaSync, FaInbox } from 'react-icons/fa';
+import { FaSync, FaInbox, FaSearch } from 'react-icons/fa';
 import { getTranscriptions, deleteTranscription } from '../services/api';
 import { TranscriptionCard } from '../components/TranscriptionCard';
 import type { Transcription } from '../types';
@@ -9,6 +9,8 @@ import { useTranslation } from 'react-i18next';
 export const History = () => {
   const { t } = useTranslation();
   const [transcriptions, setTranscriptions] = useState<Transcription[]>([]);
+  const [filteredTranscriptions, setFilteredTranscriptions] = useState<Transcription[]>([]);
+  const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [total, setTotal] = useState(0);
@@ -32,6 +34,23 @@ export const History = () => {
   useEffect(() => {
     fetchTranscriptions();
   }, []);
+
+  // Filter transcriptions based on search query
+  useEffect(() => {
+    if (!searchQuery.trim()) {
+      setFilteredTranscriptions(transcriptions);
+      return;
+    }
+
+    const query = searchQuery.toLowerCase();
+    const filtered = transcriptions.filter(t =>
+      t.patient_context?.name?.toLowerCase().includes(query) ||
+      t.patient_id?.toLowerCase().includes(query) ||
+      t.medical_note?.toLowerCase().includes(query) ||
+      t.text?.toLowerCase().includes(query)
+    );
+    setFilteredTranscriptions(filtered);
+  }, [searchQuery, transcriptions]);
 
   const handleDelete = async (id: number) => {
     try {
@@ -78,7 +97,7 @@ export const History = () => {
     <div className="flex-1 overflow-y-auto flex justify-center">
       <div className="w-full max-w-3xl px-8 py-8">
       {/* Header */}
-      <div className="flex items-center justify-between mb-8">
+      <div className="flex items-center justify-between mb-6">
         <div>
           <h2 className="text-3xl font-bold text-[#0C1523] mb-2">
             {t('history.title')}
@@ -87,7 +106,7 @@ export const History = () => {
             {t('common.total')}: <span className="font-semibold">{total}</span> {t('history.transcriptions')}
           </p>
         </div>
-        
+
         <button
           onClick={fetchTranscriptions}
           className="flex items-center space-x-2 text-[#5FA9DF] hover:text-[#4A9BCE] font-medium hover:bg-[#F0F8FF] px-4 py-2 rounded-full transition-all duration-200"
@@ -97,8 +116,37 @@ export const History = () => {
         </button>
       </div>
 
+      {/* Search Bar */}
+      <div className="mb-6">
+        <div className="relative">
+          <FaSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+          <input
+            type="text"
+            placeholder="Buscar por nombre de paciente, ID o contenido..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#5FA9DF] focus:border-[#5FA9DF] text-[#0C1523]"
+          />
+        </div>
+        {searchQuery && (
+          <p className="mt-2 text-sm text-gray-600">
+            {filteredTranscriptions.length} resultado{filteredTranscriptions.length !== 1 ? 's' : ''} encontrado{filteredTranscriptions.length !== 1 ? 's' : ''}
+          </p>
+        )}
+      </div>
+
       {/* List */}
-      {transcriptions.length === 0 ? (
+      {filteredTranscriptions.length === 0 && searchQuery ? (
+        <div className="card text-center py-12">
+          <FaSearch className="text-6xl text-[#C7E7FF] mx-auto mb-4" />
+          <h3 className="text-xl font-bold text-[#0C1523] mb-2">
+            No se encontraron resultados
+          </h3>
+          <p className="text-[#0C1523] font-medium">
+            No hay transcripciones que coincidan con "{searchQuery}"
+          </p>
+        </div>
+      ) : transcriptions.length === 0 ? (
         <div className="card text-center py-12">
           <FaInbox className="text-6xl text-[#C7E7FF] mx-auto mb-4" />
           <h3 className="text-xl font-bold text-[#0C1523] mb-2">
@@ -110,7 +158,7 @@ export const History = () => {
         </div>
       ) : (
         <div className="space-y-4">
-          {transcriptions.map((transcription) => (
+          {filteredTranscriptions.map((transcription) => (
             <TranscriptionCard
               key={transcription.id}
               transcription={transcription}

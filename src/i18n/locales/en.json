@@ -177,5 +177,8 @@
     "accessDenied": "Access Denied",
     "adminOnly": "Only administrators can access this page.",
     "systemTitle": "Medical transcription system"
-  }
+  },
+  "download_clinical_note": "Clinical Note (EHR)",
+  "download_billing_packet": "Billing Packet",
+  "download_patient_summary": "Patient Summary"
 }

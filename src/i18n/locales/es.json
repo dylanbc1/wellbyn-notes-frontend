@@ -177,5 +177,8 @@
     "accessDenied": "Acceso Denegado",
     "adminOnly": "Solo los administradores pueden acceder a esta página.",
     "systemTitle": "Sistema de transcripción médica"
-  }
+  },
+  "download_clinical_note": "Nota Clínica (EHR)",
+  "download_billing_packet": "Paquete de Facturación",
+  "download_patient_summary": "Resumen para Paciente"
 }
